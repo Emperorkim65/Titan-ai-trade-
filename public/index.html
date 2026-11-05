@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#080d18"><title>TITAN AI TRADER</title>
+<style>
+:root{color-scheme:dark;--bg:#080d18;--panel:#111a2b;--line:#25334b;--muted:#9ba9bf;--text:#f3f6fc;--gold:#e8b84c;--green:#31d49a;--red:#ff667a}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#17233a 0,var(--bg) 55%);color:var(--text);font:15px system-ui,Arial,sans-serif;min-height:100vh}
+main{max-width:900px;margin:auto;padding:22px 16px 40px}.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.brand{font-weight:900;letter-spacing:2px;font-size:24px}.brand span{color:var(--gold)}.sub{color:var(--muted);font-size:12px;margin-top:4px}
+.status{border:1px solid var(--line);border-radius:99px;padding:7px 11px;color:var(--green);font-size:12px}
+.panel{background:linear-gradient(145deg,#141f33,#0e1727);border:1px solid var(--line);border-radius:18px;padding:18px;margin-top:18px;box-shadow:0 12px 35px #0003}
+.controls{display:grid;grid-template-columns:1fr 1fr auto;gap:10px}label{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}select,button{width:100%;padding:12px;border-radius:10px;border:1px solid #35445e;background:#0a1220;color:var(--text);font:inherit}button{background:var(--gold);color:#17120a;font-weight:800;border:0;cursor:pointer;align-self:end}
+.signal{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.signal h1{font-size:38px;margin:4px 0}.signal p{color:var(--muted);margin:0}.tag{font-size:12px;color:var(--gold);border:1px solid #6b572e;border-radius:99px;padding:6px 10px}
+.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px}.metric{background:#0a1322;border:1px solid var(--line);padding:13px;border-radius:12px;min-width:0}.metric small{display:block;color:var(--muted);font-size:11px}.metric strong{display:block;margin-top:5px;font-size:18px;overflow-wrap:anywhere}
+.levels{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:14px}.level{border-radius:12px;padding:13px;background:#0a1322;border:1px solid var(--line)}.level small{color:var(--muted);display:block}.level strong{display:block;margin-top:6px;font-size:16px}
+.note{color:var(--muted);font-size:13px;line-height:1.55}.error{color:var(--red)}.foot{font-size:11px;color:#8190a7;line-height:1.5;margin:18px 2px}
+@media(max-width:560px){.controls{grid-template-columns:1fr 1fr}.controls button{grid-column:1/-1}.metrics{grid-template-columns:repeat(2,1fr)}.levels{grid-template-columns:repeat(2,1fr)}.signal h1{font-size:32px}}
+</style></head>
+<body><main>
+<header class="top"><div><div class="brand">TITAN <span>AI</span> TRADER</div><div class="sub">LIVE MARKET DATA · TECHNICAL ANALYSIS · MANUAL SIGNALS</div></div><div class="status" id="connection">● Connecting</div></header>
+<section class="panel"><div class="controls">
+<div><label for="symbol">MARKET</label><select id="symbol"><option>R_100</option><option>R_75</option><option>R_50</option><option>R_25</option><option>R_10</option><option>1HZ100V</option><option>1HZ75V</option><option>1HZ50V</option><option>1HZ25V</option><option>1HZ10V</option><option>BOOM1000</option><option>BOOM500</option><option>CRASH1000</option><option>CRASH500</option></select></div>
+<div><label for="timeframe">TIMEFRAME</label><select id="timeframe"><option value="60">1 minute</option><option value="300">5 minutes</option><option value="900">15 minutes</option><option value="3600">1 hour</option></select></div>
+<button id="refresh">ANALYZE MARKET</button></div></section>
+<section class="panel"><div class="signal"><div><div class="sub">TITAN MARKET DECISION</div><h1 id="signal">WAIT</h1><p id="reason">Loading live market candles…</p></div><div class="tag" id="market">R_100 · 1 MIN</div></div>
+<div class="metrics"><div class="metric"><small>ENTRY / LAST PRICE</small><strong id="entry">—</strong></div><div class="metric"><small>RSI (14)</small><strong id="rsi">—</strong></div><div class="metric"><small>ATR (14)</small><strong id="atr">—</strong></div></div>
+<div class="levels"><div class="level"><small>STOP LOSS</small><strong id="sl">—</strong></div><div class="level"><small>TAKE PROFIT 1</small><strong id="tp1">—</strong></div><div class="level"><small>TAKE PROFIT 2</small><strong id="tp2">—</strong></div><div class="level"><small>TAKE PROFIT 3</small><strong id="tp3">—</strong></div></div>
+<div class="metrics"><div class="metric"><small>EMA 9</small><strong id="ema9">—</strong></div><div class="metric"><small>EMA 21</small><strong id="ema21">—</strong></div><div class="metric"><small>EMA 50</small><strong id="ema50">—</strong></div></div>
+<p class="note" id="invalidation">Invalidation guidance will appear here.</p><p class="note" id="updated">Waiting for first analysis.</p></section>
+<p class="foot">Risk warning: TITAN provides technical analysis, not guaranteed predictions or financial advice. No system can guarantee a win rate. Signals may be wrong, delayed, or affected by spread and execution. Verify every setup, use appropriate position sizing, and test before risking money. This version does not place trades or connect to a funded account.</p>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+function fmt(v){return v===null||v===undefined?"—":Number(v).toLocaleString(undefined,{maximumSignificantDigits:8});}
+async function analyze(){
+  $("refresh").disabled=true;$("refresh").textContent="ANALYZING…";$("connection").textContent="● Fetching Deriv data";
+  try{
+    const symbol=$("symbol").value, timeframe=Number($("timeframe").value);
+    const r=await fetch("/api/analyze?symbol="+encodeURIComponent(symbol)+"&granularity="+timeframe);
+    const d=await r.json();if(!r.ok)throw new Error(d.error||"Analysis failed");
+    $("signal").textContent=d.signal;$("signal").style.color=d.signal==="BUY"?"var(--green)":d.signal==="SELL"?"var(--red)":"var(--gold)";
+    $("reason").textContent=d.reason;$("market").textContent=symbol+" · "+({60:"1 MIN",300:"5 MIN",900:"15 MIN",3600:"1 HOUR"}[timeframe]);
+    $("entry").textContent=fmt(d.entry);$("rsi").textContent=fmt(d.rsi);$("atr").textContent=fmt(d.atr);$("sl").textContent=fmt(d.stopLoss);
+    $("tp1").textContent=fmt(d.takeProfits[0]);$("tp2").textContent=fmt(d.takeProfits[1]);$("tp3").textContent=fmt(d.takeProfits[2]);
+    $("ema9").textContent=fmt(d.ema9);$("ema21").textContent=fmt(d.ema21);$("ema50").textContent=fmt(d.ema50);
+    $("invalidation").textContent="Setup invalidation: "+d.invalidation;
+    $("updated").textContent="Last candle: "+new Date(d.candleTime*1000).toLocaleString()+" · Auto-refresh every 60 seconds.";
+    $("connection").textContent="● Deriv data connected";
+  }catch(e){$("connection").textContent="● Data unavailable";$("reason").textContent=e.message;$("reason").className="error";}
+  finally{$("refresh").disabled=false;$("refresh").textContent="ANALYZE MARKET";}
+}
+$("refresh").addEventListener("click",analyze);$("symbol").addEventListener("change",analyze);$("timeframe").addEventListener("change",analyze);
+analyze();setInterval(analyze,60000);
+</script></body></html>
