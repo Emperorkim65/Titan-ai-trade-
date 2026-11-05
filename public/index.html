@@ -46,7 +46,7 @@ async function analyze(){
     $("invalidation").textContent="Setup invalidation: "+d.invalidation;
     $("updated").textContent="Last candle: "+new Date(d.candleTime*1000).toLocaleString()+" · Auto-refresh every 60 seconds.";
     $("connection").textContent="● Deriv data connected";
-  }catch(e){$("connection").textContent="● Data unavailable";$("reason").textContent=e.message;$("reason").className="error";}
+  }catch(e){$("connection").textContent="● Data unavailable";$("market").textContent=symbol+" · "+({60:"1 MIN",300:"5 MIN",900:"15 MIN",3600:"1 HOUR"}[timeframe]||"");$("signal").textContent="WAIT";$("signal").style.color="var(--gold)";$("reason").textContent="No verified market data: "+e.message;$("reason").className="error";["entry","rsi","atr","sl","tp1","tp2","tp3","ema9","ema21","ema50"].forEach(id=>$(id).textContent="—");$("invalidation").textContent="No trade setup. Wait until live data is restored.";$("updated").textContent="Analysis failed. No signal is available.";}
   finally{$("refresh").disabled=false;$("refresh").textContent="ANALYZE MARKET";}
 }
 $("refresh").addEventListener("click",analyze);$("symbol").addEventListener("change",analyze);$("timeframe").addEventListener("change",analyze);
