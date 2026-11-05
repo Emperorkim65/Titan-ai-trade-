@@ -39,7 +39,13 @@ function derivRequest(payload) {
       if (data.error) { clearTimeout(timer); ws.close(); reject(new Error(data.error.message || "Deriv API error")); }
       else if (data.candles) { clearTimeout(timer); ws.close(); resolve(data.candles); }
     });
-    ws.on("error", err => { clearTimeout(timer); reject(err); });
+    ws.on("unexpected-response", (_request, response) => {
+      clearTimeout(timer);
+      const status = response.statusCode || "unknown";
+      response.resume();
+      reject(new Error("Deriv WebSocket handshake failed (HTTP " + status + "). Check the Deriv App ID and Deriv service availability."));
+    });
+    ws.on("error", err => { clearTimeout(timer); reject(new Error("Deriv WebSocket connection error: " + err.message)); });
   });
 }
 
