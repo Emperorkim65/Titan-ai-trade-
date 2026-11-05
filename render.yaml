@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: titan-ai-trader
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: TRADINGVIEW_WEBHOOK_SECRET
+        generateValue: true
+      - key: DERIV_APP_ID
+        value: "1089"
