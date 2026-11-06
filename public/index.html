@@ -43,6 +43,12 @@ main{max-width:900px;margin:auto;padding:22px 16px 40px}.top{display:flex;align-
 <div class="metrics"><div class="metric"><small>ADAPTIVE DECISION</small><strong id="adaptiveSignal">—</strong></div><div class="metric"><small>MODEL SCORE</small><strong id="adaptiveConfidence">—</strong></div><div class="metric"><small>EMA WEIGHT</small><strong id="weightEma">—</strong></div><div class="metric"><small>FRACTAL WEIGHT</small><strong id="weightFractal">—</strong></div><div class="metric"><small>COMBINED WEIGHT</small><strong id="weightCombined">—</strong></div><div class="metric"><small>COMPONENT VOTES</small><strong id="adaptiveVotes">—</strong></div></div>
 <p class="note" id="adaptiveReason">Run adaptive analysis to calibrate weights from historical data. This is a signal-ranking aid, not an execution instruction.</p><p class="note" id="adaptiveStatus">No adaptive analysis run yet.</p>
 </section>
+<section class="panel" id="mtfPanel">
+<div class="signal"><div><div class="sub">TITAN MULTI-TIMEFRAME CONFIRMATION</div><h2 style="margin:5px 0 0;font-size:23px">Four-chart alignment</h2><p class="note">1H trend · 15M confirmation · 5M setup · 1M trigger</p></div><div class="tag">WAIT WHEN MISALIGNED</div></div>
+<div class="controls" style="margin-top:14px"><div><label>MARKET</label><div class="note" id="mtfMarket">Uses selected market</div></div><div><label>REQUIRED ALIGNMENT</label><div class="note">All four timeframes</div></div><button id="runMtf">CHECK FOUR TIMEFRAMES</button></div>
+<div class="metrics"><div class="metric"><small>FINAL DECISION</small><strong id="mtfSignal">—</strong></div><div class="metric"><small>MODEL SCORE</small><strong id="mtfConfidence">—</strong></div><div class="metric"><small>1H MACRO</small><strong id="mtf1h">—</strong></div><div class="metric"><small>15M CONFIRMATION</small><strong id="mtf15m">—</strong></div><div class="metric"><small>5M SETUP</small><strong id="mtf5m">—</strong></div><div class="metric"><small>1M TRIGGER</small><strong id="mtf1m">—</strong></div></div>
+<p class="note" id="mtfReason">Run a check to compare the four timeframes.</p><p class="note" id="mtfStatus">No multi-timeframe check run yet.</p>
+</section>
 <p class="foot">Risk warning: TITAN provides technical analysis, not guaranteed predictions or financial advice. No system can guarantee a win rate. Signals may be wrong, delayed, or affected by spread and execution. Verify every setup, use appropriate position sizing, and test before risking money. This version does not place trades or connect to a funded account.</p>
 </main>
 <script>
@@ -104,6 +110,26 @@ $("runBacktest").addEventListener("click",backtestSelected);$("runBasket").addEv
  finally{$("runAdaptive").disabled=false;$("runAdaptive").textContent="RUN ADAPTIVE ANALYSIS";}
 }
 $("runAdaptive").addEventListener("click",runAdaptive);
+async function runMtf(){
+ const symbol=$("symbol").value;
+ $("runMtf").disabled=true;$("runMtf").textContent="CHECKING…";$("mtfMarket").textContent=symbol;
+ $("mtfStatus").textContent="Fetching 1H, 15M, 5M and 1M candle history from Deriv…";
+ try{
+  const response=await fetch("/api/multitimeframe/analyze?symbol="+encodeURIComponent(symbol));
+  const d=await response.json();if(!response.ok)throw new Error(d.error||"Multi-timeframe check failed");
+  $("mtfSignal").textContent=d.signal;$("mtfSignal").style.color=d.signal==="BUY"?"var(--green)":d.signal==="SELL"?"var(--red)":"var(--gold)";
+  $("mtfConfidence").textContent=d.confidence+"/100";
+  $("mtf1h").textContent=d.timeframes["1h"].direction;
+  $("mtf15m").textContent=d.timeframes["15m"].direction;
+  $("mtf5m").textContent=d.timeframes["5m"].direction;
+  $("mtf1m").textContent=d.timeframes["1m"].direction;
+  $("mtfReason").textContent=d.reason;
+  $("mtfStatus").textContent="Checked "+symbol+" across four timeframes. All four must pass trend and fractal confirmation. No orders are placed.";
+ }catch(e){$("mtfSignal").textContent="WAIT";$("mtfConfidence").textContent="—";$("mtfReason").textContent=e.message;$("mtfStatus").textContent="Multi-timeframe analysis unavailable.";}
+ finally{$("runMtf").disabled=false;$("runMtf").textContent="CHECK FOUR TIMEFRAMES";}
+}
+$("runMtf").addEventListener("click",runMtf);
+
 
 analyze();setInterval(analyze,60000);
 </script></body></html>
