@@ -2,6 +2,7 @@ const express = require("express");
 const WebSocket = require("ws");
 const crypto = require("crypto");
 const path = require("path");
+const { analyzeFractal, confirmsBalancedSignal } = require("./fractal");
 
 const app = express();
 app.use(express.json({ limit: "32kb" }));
@@ -96,12 +97,17 @@ function analyze(candles) {
   const risk=volatility*1.5;
   const entry=current;
   const sl=signal==="BUY"?entry-risk:signal==="SELL"?entry+risk:null;
+  const fractal = analyzeFractal(candles);
+  if (signal !== "WAIT" && !confirmsBalancedSignal(signal, fractal)) {
+    signal = "WAIT";
+    reason = "EMA/RSI setup did not receive balanced multi-scale fractal confirmation.";
+  }
   const direction=signal==="BUY"?1:signal==="SELL"?-1:0;
   return {
     signal, symbol:null, entry:round(entry), stopLoss:sl===null?null:round(sl),
     takeProfits:direction?[round(entry+direction*risk),round(entry+direction*risk*2),round(entry+direction*risk*3)]:[],
     rsi:round(strength), ema9:round(fast), ema21:round(mid), ema50:round(slow),
-    atr:round(volatility), reason,
+    atr:round(volatility), reason, fractal,
     invalidation: signal==="BUY"?"A candle close below EMA21 weakens this setup.":signal==="SELL"?"A candle close above EMA21 weakens this setup.":"Wait for clear trend and momentum alignment.",
     candleTime:candles[candles.length-1].epoch
   };
@@ -109,7 +115,17 @@ function analyze(candles) {
 function round(n){ return Number(Number(n).toPrecision(8)); }
 
 app.get("/api/health", (_req,res)=>res.json({ ok:true, service:"TITAN AI TRADER", dataSource:"Deriv public market candles", mode:"analysis-only" }));
-app.get("/api/config", (_req,res)=>res.json({ symbols:["R_10","R_25","R_50","R_75","R_100","1HZ10V","1HZ25V","1HZ50V","1HZ75V","1HZ100V","BOOM1000","BOOM500","CRASH1000","CRASH500"], timeframes:[60,300,900,3600], execution:false }));
+app.get("/api/config", (_req,res)=>res.json({ symbols:["R_10","R_25","R_50","R_75","R_100","1HZ10V","1HZ25V","1HZ50V","1HZ75V","1HZ100V","BOOM1000","BOOM500","CRASH1000","CRASH500"], timeframes:[60,300,900,3600], mode:"balanced", engine:"weierstrass-inspired-fractal", execution:false }));
+app.get("/api/fractal/analyze", async (req,res)=>{
+  const symbol=String(req.query.symbol || "R_100");
+  const granularity=Number(req.query.granularity || 60);
+  if(!/^[A-Z0-9_]{2,24}$/.test(symbol)) return res.status(400).json({error:"Invalid symbol"});
+  if(![60,300,900,3600].includes(granularity)) return res.status(400).json({error:"Unsupported timeframe"});
+  try {
+    const candles=await derivRequest({ ticks_history:symbol, adjust_start_time:1, count:150, end:"latest", granularity, style:"candles" });
+    res.json({symbol,timeframe:granularity,mode:"balanced",...analyzeFractal(candles)});
+  } catch(e) { res.status(502).json({error:e.message || "Unable to retrieve market data"}); }
+});
 app.get("/api/analyze", async (req,res)=>{
   const symbol=String(req.query.symbol || "R_100");
   const granularity=Number(req.query.granularity || 60);
