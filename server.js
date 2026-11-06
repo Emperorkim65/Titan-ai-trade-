@@ -4,6 +4,7 @@ const crypto = require("crypto");
 const path = require("path");
 const { analyzeFractal, confirmsBalancedSignal } = require("./fractal");
 const { runBacktest } = require("./backtest");
+const { analyzeAdaptive } = require("./adaptive");
 
 const app = express();
 app.use(express.json({ limit: "32kb" }));
@@ -119,7 +120,7 @@ function analyze(candles) {
 function round(n){ return Number(Number(n).toPrecision(8)); }
 
 app.get("/api/health", (_req,res)=>res.json({ ok:true, service:"TITAN AI TRADER", dataSource:"Deriv public market candles", mode:"analysis-only" }));
-app.get("/api/config", (_req,res)=>res.json({ symbols:[...ALLOWED_SYMBOLS], timeframes:[60,300,900,3600], mode:"balanced", engine:"weierstrass-inspired-fractal", backtest:{minimumCandles:300,maximumCandles:5000,trainRatioDefault:0.7}, execution:false }));
+app.get("/api/config", (_req,res)=>res.json({ symbols:[...ALLOWED_SYMBOLS], timeframes:[60,300,900,3600], mode:"balanced", engine:"weierstrass-inspired-fractal", backtest:{minimumCandles:300,maximumCandles:5000,trainRatioDefault:0.7}, adaptive:{minimumCandles:400,calibration:"prior-history in-sample only"}, execution:false }));
 app.get("/api/backtest", async (req,res)=>{
   const symbol=String(req.query.symbol || "R_100");
   const granularity=Number(req.query.granularity || 60);
@@ -136,6 +137,19 @@ app.get("/api/backtest", async (req,res)=>{
     result.data.symbol=symbol;result.data.granularity=granularity;result.data.requestedCandles=count;result.data.source="Deriv historical candles";
     res.json(result);
   } catch(e) { res.status(502).json({error:e.message || "Historical backtest failed"}); }
+});
+app.get("/api/adaptive/analyze", async (req,res)=>{
+  const symbol=String(req.query.symbol || "R_100");
+  const granularity=Number(req.query.granularity || 60);
+  const count=Number(req.query.count || 650);
+  if(!ALLOWED_SYMBOLS.has(symbol)) return res.status(400).json({error:"Unsupported market symbol. Check /api/config for supported markets."});
+  if(![60,300,900,3600].includes(granularity)) return res.status(400).json({error:"Unsupported timeframe"});
+  if(!Number.isInteger(count)||count<400||count>1500) return res.status(400).json({error:"count must be an integer from 400 to 1500"});
+  try {
+    const candles=await derivRequest({ticks_history:symbol,adjust_start_time:1,count,end:"latest",granularity,style:"candles"});
+    if(!Array.isArray(candles)||candles.length<400) return res.status(502).json({error:"Deriv returned fewer than 400 candles; adaptive analysis needs more history."});
+    res.json({symbol,timeframe:granularity,...analyzeAdaptive(candles),data:{candles:candles.length,source:"Deriv historical candles"}});
+  } catch(e) { res.status(502).json({error:e.message || "Adaptive analysis failed"}); }
 });
 app.get("/api/fractal/analyze", async (req,res)=>{
   const symbol=String(req.query.symbol || "R_100");
