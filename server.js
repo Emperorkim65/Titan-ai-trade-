@@ -121,7 +121,7 @@ function analyze(candles) {
 function round(n){ return Number(Number(n).toPrecision(8)); }
 
 app.get("/api/health", (_req,res)=>res.json({ ok:true, service:"TITAN AI TRADER", dataSource:"Deriv public market candles", mode:"analysis-only" }));
-app.get("/api/config", (_req,res)=>res.json({ symbols:[...ALLOWED_SYMBOLS], timeframes:[60,300,900,3600], mode:"balanced", engine:"weierstrass-inspired-fractal", backtest:{minimumCandles:300,maximumCandles:5000,trainRatioDefault:0.7}, adaptive:{minimumCandles:400,calibration:"prior-history in-sample only"}, execution:false }));
+app.get("/api/config", (_req,res)=>res.json({ symbols:[...ALLOWED_SYMBOLS], timeframes:[60,300,900,3600], mode:"balanced", engine:"weierstrass-inspired-fractal", backtest:{minimumCandles:300,maximumCandles:5000,trainRatioDefault:0.7}, adaptive:{minimumCandles:400,calibration:"prior-history in-sample only"}, multiTimeframe:{timeframes:[60,300,900,3600],candlesPerTimeframe:150,confirmation:"all four directions and balanced fractal filters must agree"}, execution:false }));
 app.get("/api/backtest", async (req,res)=>{
   const symbol=String(req.query.symbol || "R_100");
   const granularity=Number(req.query.granularity || 60);
