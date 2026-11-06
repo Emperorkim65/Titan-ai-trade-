@@ -3,6 +3,7 @@ const WebSocket = require("ws");
 const crypto = require("crypto");
 const path = require("path");
 const { analyzeFractal, confirmsBalancedSignal } = require("./fractal");
+const { runBacktest } = require("./backtest");
 
 const app = express();
 app.use(express.json({ limit: "32kb" }));
@@ -12,10 +13,12 @@ const PORT = process.env.PORT || 10000;
 const DERIV_APP_ID = process.env.DERIV_APP_ID || "1089";
 const WEBHOOK_SECRET = process.env.TRADINGVIEW_WEBHOOK_SECRET || "";
 const ALLOWED_SYMBOLS = new Set([
-  "R_10","R_25","R_ เพราะ","R_50","R_75","R_100",
+  "R_10","R_25","R_50","R_75","R_100",
   "1HZ10V","1HZ25V","1HZ50V","1HZ75V","1HZ100V",
-  "BOOM1000","BOOM500","CRASH1000","CRASH500"
-].filter(Boolean));
+  "BOOM1000","BOOM500","CRASH1000","CRASH500",
+  "frxEURUSD","frxGBPUSD","frxUSDJPY","frxAUDUSD","frxUSDCAD",
+  "frxUSDCHF","frxNZDUSD","frxEURGBP","frxEURJPY","frxGBPJPY","frxXAUUSD"
+]);
 
 const rate = new Map();
 app.use("/api", (req, res, next) => {
@@ -116,7 +119,24 @@ function analyze(candles) {
 function round(n){ return Number(Number(n).toPrecision(8)); }
 
 app.get("/api/health", (_req,res)=>res.json({ ok:true, service:"TITAN AI TRADER", dataSource:"Deriv public market candles", mode:"analysis-only" }));
-app.get("/api/config", (_req,res)=>res.json({ symbols:["R_10","R_25","R_50","R_75","R_100","1HZ10V","1HZ25V","1HZ50V","1HZ75V","1HZ100V","BOOM1000","BOOM500","CRASH1000","CRASH500"], timeframes:[60,300,900,3600], mode:"balanced", engine:"weierstrass-inspired-fractal", execution:false }));
+app.get("/api/config", (_req,res)=>res.json({ symbols:[...ALLOWED_SYMBOLS], timeframes:[60,300,900,3600], mode:"balanced", engine:"weierstrass-inspired-fractal", backtest:{minimumCandles:300,maximumCandles:5000,trainRatioDefault:0.7}, execution:false }));
+app.get("/api/backtest", async (req,res)=>{
+  const symbol=String(req.query.symbol || "R_100");
+  const granularity=Number(req.query.granularity || 60);
+  const count=Number(req.query.count || 1200);
+  const endEpoch=req.query.endEpoch===undefined?undefined:Number(req.query.endEpoch);
+  if(!ALLOWED_SYMBOLS.has(symbol)) return res.status(400).json({error:"Unsupported market symbol. Check /api/config for supported markets."});
+  if(![60,300,900,3600].includes(granularity)) return res.status(400).json({error:"Unsupported timeframe"});
+  if(!Number.isInteger(count)||count<300||count>5000) return res.status(400).json({error:"count must be an integer from 300 to 5000"});
+  if(endEpoch!==undefined&&(!Number.isInteger(endEpoch)||endEpoch<1)) return res.status(400).json({error:"endEpoch must be a positive Unix timestamp"});
+  try {
+    const candles=await derivRequest({ticks_history:symbol,adjust_start_time:1,count,end:endEpoch===undefined?"latest":endEpoch,granularity,style:"candles"});
+    if(!Array.isArray(candles)||candles.length<300) return res.status(502).json({error:"Deriv returned fewer than 300 candles; this market/timeframe cannot support the requested test."});
+    const result=runBacktest(candles,{trainRatio:req.query.trainRatio===undefined?0.7:Number(req.query.trainRatio),riskPercent:req.query.riskPercent===undefined?1:Number(req.query.riskPercent),costBps:req.query.costBps===undefined?1:Number(req.query.costBps)});
+    result.data.symbol=symbol;result.data.granularity=granularity;result.data.requestedCandles=count;result.data.source="Deriv historical candles";
+    res.json(result);
+  } catch(e) { res.status(502).json({error:e.message || "Historical backtest failed"}); }
+});
 app.get("/api/fractal/analyze", async (req,res)=>{
   const symbol=String(req.query.symbol || "R_100");
   const granularity=Number(req.query.granularity || 60);
