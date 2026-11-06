@@ -31,3 +31,17 @@ The backend includes a Weierstrass-inspired, finite multi-scale analysis module.
 - `npm test` runs deterministic unit tests.
 
 The confidence value is a model score, not a probability of profit or a measured win rate. Validate with out-of-sample and walk-forward backtests before using signals. Trade execution remains disabled; alerts and analysis do not place orders.
+
+
+## Historical strategy backtesting
+- `GET /api/backtest?symbol=R_100&granularity=60&count=1200&trainRatio=0.7&costBps=1`
+- Supported history size: 300–5,000 candles. Supported granularities: 60, 300, 900, 3,600 seconds.
+- Compare EMA-only, Fractal-only, and Combined Balanced strategies.
+- Chronological 70/30 split by default; configurable 60/40 through 85/15. Indicators in the test segment may use prior training candles for warm-up, but test trades are opened only at/after the split.
+- Signals are formed at candle close and entered at the next candle open. Stop distance is 1.5 ATR, target is 2R, and maximum holding period is 50 bars. If stop and target are both touched within one candle, the simulator assumes the stop was hit first.
+- Position risk defaults to 1% of current simulated equity. Estimated transaction cost defaults to 1 basis point per side and can be changed with `costBps`; this is a percentage proxy, not a broker's actual spread/commission schedule.
+- Reports trades, win rate, profit factor, net return, maximum drawdown, expectancy, and trade samples separately for in-sample and out-of-sample periods.
+- Forex symbols currently exposed in the market list include EUR/USD, GBP/USD, USD/JPY, AUD/USD, USD/CAD, USD/CHF, NZD/USD, EUR/GBP, EUR/JPY, GBP/JPY and XAU/USD. Deriv availability varies by account/market session.
+- The dashboard's basket button tests EUR/USD, Boom 1000, Crash 1000 and Volatility 100.
+
+The backtest is a research tool, not a claim of predictive accuracy. It does not model all broker-specific spread, swaps, latency, slippage, rejected orders, tick-level stop ordering, or market impact. Run multiple periods and symbols, inspect OOS trade counts and drawdown, and do not optimize against the OOS segment. No live execution is enabled.
