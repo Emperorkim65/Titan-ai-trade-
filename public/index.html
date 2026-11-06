@@ -37,6 +37,12 @@ main{max-width:900px;margin:auto;padding:22px 16px 40px}.top{display:flex;align-
 <div class="backtest-status" id="btStatus">Next-candle-open entries, ATR stop, 2R target and conservative stop-first handling when both stop and target touch in one candle.</div>
 <div class="results-wrap" style="margin-top:14px"><table><thead><tr><th>MARKET / STRATEGY</th><th>PERIOD</th><th>TRADES</th><th>WIN RATE</th><th>PROFIT FACTOR</th><th>NET RETURN</th><th>MAX DRAWDOWN</th></tr></thead><tbody id="btRows"><tr><td colspan="7" style="text-align:left;color:var(--muted)">No backtest run yet.</td></tr></tbody></table></div>
 <div class="sub" style="margin-top:12px">OOS = untouched chronological out-of-sample period. Confidence scores are not win probabilities. Results are historical simulations, not forecasts.</div></section>
+<section class="panel" id="adaptivePanel">
+<div class="signal"><div><div class="sub">TITAN ADAPTIVE INTELLIGENCE</div><h2 style="margin:5px 0 0;font-size:23px">Performance-weighted signal</h2><p class="note">Weights update from prior-history in-sample results only.</p></div><div class="tag">WALK-FORWARD CALIBRATION</div></div>
+<div class="controls" style="margin-top:14px"><div><label for="adaptiveCount">CALIBRATION CANDLES</label><select id="adaptiveCount"><option value="400">400</option><option value="650" selected>650</option><option value="1000">1,000</option><option value="1500">1,500</option></select></div><div><label>SELECTED MARKET / TIMEFRAME</label><div class="note" id="adaptiveMarket">Uses controls above</div></div><button id="runAdaptive">RUN ADAPTIVE ANALYSIS</button></div>
+<div class="metrics"><div class="metric"><small>ADAPTIVE DECISION</small><strong id="adaptiveSignal">—</strong></div><div class="metric"><small>MODEL SCORE</small><strong id="adaptiveConfidence">—</strong></div><div class="metric"><small>EMA WEIGHT</small><strong id="weightEma">—</strong></div><div class="metric"><small>FRACTAL WEIGHT</small><strong id="weightFractal">—</strong></div><div class="metric"><small>COMBINED WEIGHT</small><strong id="weightCombined">—</strong></div><div class="metric"><small>COMPONENT VOTES</small><strong id="adaptiveVotes">—</strong></div></div>
+<p class="note" id="adaptiveReason">Run adaptive analysis to calibrate weights from historical data. This is a signal-ranking aid, not an execution instruction.</p><p class="note" id="adaptiveStatus">No adaptive analysis run yet.</p>
+</section>
 <p class="foot">Risk warning: TITAN provides technical analysis, not guaranteed predictions or financial advice. No system can guarantee a win rate. Signals may be wrong, delayed, or affected by spread and execution. Verify every setup, use appropriate position sizing, and test before risking money. This version does not place trades or connect to a funded account.</p>
 </main>
 <script>
@@ -78,6 +84,26 @@ function addBacktestRows(symbol,result){
 async function runHistorical(symbol){const q=new URLSearchParams({symbol,granularity:$("timeframe").value,count:$("btCount").value,trainRatio:$("btSplit").value,costBps:$("btCost").value});const response=await fetch("/api/backtest?"+q.toString()),data=await response.json();if(!response.ok)throw new Error(symbol+": "+(data.error||"Backtest failed"));addBacktestRows(symbol,data);return data;}
 async function backtestBasket(){const symbols=["frxEURUSD","BOOM1000","CRASH1000","R_100"];btRows.replaceChildren();$("runBacktest").disabled=true;$("runBasket").disabled=true;try{for(let i=0;i<symbols.length;i++){btStatus.textContent="Running "+(i+1)+"/"+symbols.length+": "+symbols[i]+"…";await runHistorical(symbols[i]);}btStatus.textContent="Completed "+symbols.length+" market categories. Compare OUT-OF-SAMPLE rows first.";}catch(e){btStatus.textContent=e.message;}finally{$("runBacktest").disabled=false;$("runBasket").disabled=false;}}
 async function backtestSelected(){const symbol=$("symbol").value;btRows.replaceChildren();$("runBacktest").disabled=true;$("runBasket").disabled=true;try{btStatus.textContent="Downloading historical candles and running all three strategies for "+symbol+"…";await runHistorical(symbol);btStatus.textContent="Completed. Prioritize the OUT-OF-SAMPLE rows when comparing strategies.";}catch(e){btStatus.textContent=e.message;}finally{$("runBacktest").disabled=false;$("runBasket").disabled=false;}}
-$("runBacktest").addEventListener("click",backtestSelected);$("runBasket").addEventListener("click",backtestBasket);
+$("runBacktest").addEventListener("click",backtestSelected);$("runBasket").addEventListener("click",backtestBasket);async function runAdaptive(){
+ const symbol=$("symbol").value,timeframe=$("timeframe").value,count=$("adaptiveCount").value;
+ $("runAdaptive").disabled=true;$("runAdaptive").textContent="CALIBRATING…";$("adaptiveStatus").textContent="Evaluating prior historical performance for "+symbol+"…";
+ $("adaptiveMarket").textContent=symbol+" · "+({60:"1 MIN",300:"5 MIN",900:"15 MIN",3600:"1 HOUR"}[Number(timeframe)]);
+ try{
+  const q=new URLSearchParams({symbol,granularity:timeframe,count});
+  const response=await fetch("/api/adaptive/analyze?"+q.toString()),d=await response.json();
+  if(!response.ok)throw new Error(d.error||"Adaptive analysis failed");
+  $("adaptiveSignal").textContent=d.signal;$("adaptiveSignal").style.color=d.signal==="BUY"?"var(--green)":d.signal==="SELL"?"var(--red)":"var(--gold)";
+  $("adaptiveConfidence").textContent=d.confidence+"/100";
+  $("weightEma").textContent=Math.round(d.weights.ema*100)+"%";
+  $("weightFractal").textContent=Math.round(d.weights.fractal*100)+"%";
+  $("weightCombined").textContent=Math.round(d.weights.combined*100)+"%";
+  $("adaptiveVotes").textContent="E "+d.componentSignals.ema+" · F "+d.componentSignals.fractal+" · C "+d.componentSignals.combined;
+  $("adaptiveReason").textContent=d.reason;
+  $("adaptiveStatus").textContent="Calibrated using "+d.calibration.candles+" prior candles. Weights use in-sample metrics only; no order execution.";
+ }catch(e){$("adaptiveSignal").textContent="WAIT";$("adaptiveConfidence").textContent="—";$("adaptiveReason").textContent=e.message;$("adaptiveStatus").textContent="Adaptive analysis unavailable.";}
+ finally{$("runAdaptive").disabled=false;$("runAdaptive").textContent="RUN ADAPTIVE ANALYSIS";}
+}
+$("runAdaptive").addEventListener("click",runAdaptive);
+
 analyze();setInterval(analyze,60000);
 </script></body></html>
