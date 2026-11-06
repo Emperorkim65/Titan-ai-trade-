@@ -53,3 +53,11 @@ The backtest is a research tool, not a claim of predictive accuracy. It does not
 - The newest candle is excluded from calibration. The out-of-sample period is not used to set the weights. When the historical sample is too small or has no positive evidence, the engine falls back to equal weights.
 - Returns component votes, normalized weights, model score, and BUY/SELL/WAIT. This is a ranking signal only; it does not place orders.
 - The weights are a heuristic ensemble calibration, not machine-learning training and not a probability of profit. Validate on additional unseen periods and symbols before relying on it.
+
+## Four-timeframe confirmation
+- `GET /api/multitimeframe/analyze?symbol=R_100`
+- Fetches 150 candles for each Deriv timeframe: 1 minute, 5 minutes, 15 minutes, and 1 hour.
+- 1H is treated as macro trend, 15M as trend confirmation, 5M as setup confirmation, and 1M as the entry trigger.
+- Each timeframe must show an EMA 9/21/50 trend with RSI confirmation and pass the balanced fractal confirmation filter. If any timeframe disagrees or fails confirmation, the final decision is WAIT.
+- The dashboard includes a manual "CHECK FOUR TIMEFRAMES" panel. It does not execute trades.
+- Strict alignment can produce fewer signals. The returned model score is not a probability of profit; validate signals with out-of-sample testing and realistic broker costs.
