@@ -96,11 +96,12 @@ function analyze(candles) {
   }
   const risk=volatility*1.5;
   const entry=current;
-  const sl=signal==="BUY"?entry-risk:signal==="SELL"?entry+risk:null;
+  let sl=signal==="BUY"?entry-risk:signal==="SELL"?entry+risk:null;
   const fractal = analyzeFractal(candles);
   if (signal !== "WAIT" && !confirmsBalancedSignal(signal, fractal)) {
     signal = "WAIT";
     reason = "EMA/RSI setup did not receive balanced multi-scale fractal confirmation.";
+    sl = null;
   }
   const direction=signal==="BUY"?1:signal==="SELL"?-1:0;
   return {
