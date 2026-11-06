@@ -5,6 +5,7 @@ const path = require("path");
 const { analyzeFractal, confirmsBalancedSignal } = require("./fractal");
 const { runBacktest } = require("./backtest");
 const { analyzeAdaptive } = require("./adaptive");
+const { analyzeMultiTimeframe } = require("./mtf");
 
 const app = express();
 app.use(express.json({ limit: "32kb" }));
@@ -137,6 +138,20 @@ app.get("/api/backtest", async (req,res)=>{
     result.data.symbol=symbol;result.data.granularity=granularity;result.data.requestedCandles=count;result.data.source="Deriv historical candles";
     res.json(result);
   } catch(e) { res.status(502).json({error:e.message || "Historical backtest failed"}); }
+});
+app.get("/api/multitimeframe/analyze", async (req,res)=>{
+  const symbol=String(req.query.symbol || "R_100");
+  if(!ALLOWED_SYMBOLS.has(symbol)) return res.status(400).json({error:"Unsupported market symbol. Check /api/config for supported markets."});
+  try {
+    const granularities=[60,300,900,3600];
+    const entries=await Promise.all(granularities.map(async granularity=>{
+      const candles=await derivRequest({ticks_history:symbol,adjust_start_time:1,count:150,end:"latest",granularity,style:"candles"});
+      if(!Array.isArray(candles)||candles.length<60) throw new Error("Insufficient candle history for "+granularity+" second timeframe");
+      return [granularity,candles];
+    }));
+    const data=Object.fromEntries(entries);
+    res.json({symbol,...analyzeMultiTimeframe(data),data:{source:"Deriv historical candles",candlesPerTimeframe:150}});
+  } catch(e) { res.status(502).json({error:e.message || "Multi-timeframe analysis failed"}); }
 });
 app.get("/api/adaptive/analyze", async (req,res)=>{
   const symbol=String(req.query.symbol || "R_100");
