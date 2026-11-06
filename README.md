@@ -45,3 +45,11 @@ The confidence value is a model score, not a probability of profit or a measured
 - The dashboard's basket button tests EUR/USD, Boom 1000, Crash 1000 and Volatility 100.
 
 The backtest is a research tool, not a claim of predictive accuracy. It does not model all broker-specific spread, swaps, latency, slippage, rejected orders, tick-level stop ordering, or market impact. Run multiple periods and symbols, inspect OOS trade counts and drawdown, and do not optimize against the OOS segment. No live execution is enabled.
+
+## Adaptive intelligence ensemble
+- `GET /api/adaptive/analyze?symbol=R_100&granularity=60&count=650`
+- Requires 400–1,500 candles. The dashboard includes a button to run this analysis for the selected market and timeframe.
+- Calculates EMA-only, fractal-only, and combined signals, then weights them using prior-history in-sample backtest expectancy, profit factor, drawdown, and trade-count reliability.
+- The newest candle is excluded from calibration. The out-of-sample period is not used to set the weights. When the historical sample is too small or has no positive evidence, the engine falls back to equal weights.
+- Returns component votes, normalized weights, model score, and BUY/SELL/WAIT. This is a ranking signal only; it does not place orders.
+- The weights are a heuristic ensemble calibration, not machine-learning training and not a probability of profit. Validate on additional unseen periods and symbols before relying on it.
