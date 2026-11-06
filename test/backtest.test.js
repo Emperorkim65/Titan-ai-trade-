@@ -1,0 +1,8 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict');
+const {runBacktest}=require('../backtest');
+function makeCandles(n=700){let p=100;const a=[];for(let i=0;i<n;i++){const drift=i%180<90?.001:-.001;const change=drift+Math.sin(i*.73)*.0008;const o=p;p*=Math.exp(change);a.push({epoch:1700000000+i*60,open:o,high:Math.max(o,p)*1.0008,low:Math.min(o,p)*.9992,close:p});}return a;}
+test('rejects too-short and malformed historical datasets',()=>{assert.throws(()=>runBacktest(makeCandles(100)),/at least 300/);const c=makeCandles();c[30].high=0;assert.throws(()=>runBacktest(c),/invalid OHLC/);});
+test('returns all three comparable strategies and both chronological periods',()=>{const r=runBacktest(makeCandles());assert.deepEqual(Object.keys(r.results),['ema','fractal','combined']);for(const m of Object.values(r.results)){assert.ok(m.inSample);assert.ok(m.outOfSample);for(const p of [m.inSample,m.outOfSample]){assert.ok(p.trades>=0);assert.ok(p.winRate>=0&&p.winRate<=100);assert.ok(p.maxDrawdownPercent>=0);assert.ok(p.netReturnPercent>-100);}}assert.equal(r.data.trainCandles+r.data.testCandles,700);});
+test('uses a strict time-ordered out-of-sample boundary',()=>{const c=makeCandles();const r=runBacktest(c);const boundary=c[r.data.splitIndex].epoch;for(const m of Object.values(r.results)){for(const t of m.outOfSample.tradesSample){assert.ok(t.entryTime>=boundary);}}});
+test('does not report infinite profit factor when there are no losses',()=>{const r=runBacktest(makeCandles());for(const m of Object.values(r.results))for(const p of [m.inSample,m.outOfSample])assert.ok(p.profitFactor===null||Number.isFinite(p.profitFactor));});
