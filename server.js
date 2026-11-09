@@ -12,7 +12,7 @@ app.use(express.json({ limit: "32kb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
 const PORT = process.env.PORT || 10000;
-const DERIV_APP_ID = process.env.DERIV_APP_ID || "1089";
+const DERIV_PUBLIC_WS_URL = "wss://api.derivws.com/trading/v1/options/ws/public";
 const WEBHOOK_SECRET = process.env.TRADINGVIEW_WEBHOOK_SECRET || "";
 const ALLOWED_SYMBOLS = new Set([
   "R_10","R_25","R_50","R_75","R_100",
@@ -36,22 +36,35 @@ app.use("/api", (req, res, next) => {
 
 function derivRequest(payload) {
   return new Promise((resolve, reject) => {
-    const ws = new WebSocket(`wss://ws.derivws.com/websockets/v3?app_id=${encodeURIComponent(DERIV_APP_ID)}`);
-    const timer = setTimeout(() => { ws.terminate(); reject(new Error("Deriv market data timed out")); }, 12000);
+    const ws = new WebSocket(DERIV_PUBLIC_WS_URL);
+    const timer = setTimeout(() => {
+      ws.terminate();
+      reject(new Error("Deriv public market-data request timed out"));
+    }, 12000);
     ws.on("open", () => ws.send(JSON.stringify(payload)));
     ws.on("message", raw => {
       let data;
       try { data = JSON.parse(raw.toString()); } catch { return; }
-      if (data.error) { clearTimeout(timer); ws.close(); reject(new Error(data.error.message || "Deriv API error")); }
-      else if (data.candles) { clearTimeout(timer); ws.close(); resolve(data.candles); }
+      if (data.error) {
+        clearTimeout(timer);
+        ws.close();
+        reject(new Error(data.error.message || "Deriv API error"));
+      } else if (data.candles) {
+        clearTimeout(timer);
+        ws.close();
+        resolve(data.candles);
+      }
     });
     ws.on("unexpected-response", (_request, response) => {
       clearTimeout(timer);
       const status = response.statusCode || "unknown";
       response.resume();
-      reject(new Error("Deriv WebSocket handshake failed (HTTP " + status + "). Check the Deriv App ID and Deriv service availability."));
+      reject(new Error("Deriv public WebSocket handshake failed (HTTP " + status + "). Check Deriv public API availability."));
     });
-    ws.on("error", err => { clearTimeout(timer); reject(new Error("Deriv WebSocket connection error: " + err.message)); });
+    ws.on("error", err => {
+      clearTimeout(timer);
+      reject(new Error("Deriv public WebSocket connection error: " + err.message));
+    });
   });
 }
 
